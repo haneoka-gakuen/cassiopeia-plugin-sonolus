@@ -1,0 +1,346 @@
+import { WebGLRenderer, PerspectiveCamera, Scene, Vector3, SRGBColorSpace } from "three";
+import {
+  ParticleLayer,
+  StageProjector,
+  configureOurNotesCamera,
+  LiveUrpBloomPipeline,
+} from "@haneoka/cassiopeia-renderer-three";
+import { createOurNotesAssetManifest, nativeParticleEffectLifetime } from "@haneoka/cassiopeia-plugin-our-notes";
+
+const placeholder = "/unused";
+const sourceInfo = await fetch("/source.json").then((response) => {
+  if (!response.ok) throw Error("Could not read capture provenance");
+  return response.json();
+});
+const icons = (names) => Object.fromEntries(names.map((n) => [n, placeholder]));
+const hud = {
+  judgementImages: icons(["just", "perfect", "great", "good", "bad", "miss", "fast", "late"]),
+  comboLabelUrl: placeholder,
+  comboDigitUrls: [],
+  perfectComboLabelUrl: placeholder,
+  perfectComboDigitUrls: [],
+  pauseIconUrl: placeholder,
+  pauseFrameUrl: placeholder,
+  pauseShadowUrl: placeholder,
+  lifeIconUrls: icons(["normal", "danger", "over"]),
+  rankIconUrls: icons(["D", "C", "B", "A", "S", "SS"]),
+  rankBaseUrl: placeholder,
+  roundMask14Url: placeholder,
+  statusBaseUrl: placeholder,
+  scoreStarUrl: placeholder,
+  whiteSpriteUrl: placeholder,
+};
+const assets = createOurNotesAssetManifest(
+  { noteAtlasTextureUrl: placeholder, hud },
+  {
+    asset: (path) => "/asset/" + path,
+    runtime: (path) => "/runtime/" + path,
+  },
+);
+const renderer = new WebGLRenderer({
+  canvas: document.querySelector("#view"),
+  alpha: false,
+  preserveDrawingBuffer: true,
+});
+renderer.setSize(1920, 1080, false);
+renderer.setClearColor(0, 1);
+renderer.autoClear = false;
+renderer.outputColorSpace = SRGBColorSpace;
+const camera = configureOurNotesCamera(new PerspectiveCamera(54, 16 / 9, 0.1, 5000));
+const projector = new StageProjector();
+const particles = new ParticleLayer(projector, assets, 1, 4096);
+const scene = new Scene();
+scene.add(particles.group);
+scene.add(particles.laneInputGroup);
+const bloom = new LiveUrpBloomPipeline();
+bloom.setSize(1920, 1080);
+await particles.loadTextures();
+const captureWidth = 6;
+const ref = (19.12000084 * captureWidth) / 24;
+const origin = new Vector3(0, 0, -9.62).project(camera);
+const unitX = new Vector3(ref / 2, 0, -9.62).project(camera).x;
+// Sonolus' vertical effect unit is one physical lane measured in screen
+// height units, not the perspective displacement of moving along the ground.
+const unitY = new Vector3(19.12000084 / 24, 0, -9.62).project(camera).x * 2 * camera.aspect;
+const boundsByEffect = [];
+const measure = document.createElement("canvas");
+measure.width = 256;
+measure.height = 144;
+const measureCtx = measure.getContext("2d", { willReadFrequently: true });
+const atlas = document.createElement("canvas");
+atlas.width = 4096;
+atlas.height = 4096;
+const ctx = atlas.getContext("2d", { willReadFrequently: true });
+const tileWidth = 96,
+  tileHeight = 128;
+const columns = Math.floor(atlas.width / tileWidth);
+const sample = document.createElement("canvas");
+sample.width = tileWidth - 2;
+sample.height = tileHeight - 2;
+const sampleCtx = sample.getContext("2d", { willReadFrequently: true });
+const specs = [];
+for (const [kind, label, direction] of [
+  ["tap", "Normal", "none"],
+  ["slide", "Slide", "none"],
+  ["flick", "Flick", "up"],
+  ["flick", "Flick Left", "left"],
+  ["flick", "Flick Right", "right"],
+  ["connect", "Connect", "none"],
+]) {
+  for (const [judgement, j] of [
+    ["perfect", 5],
+    ["great", 4],
+    ["good", 3],
+    ["bad", 2],
+  ])
+    specs.push({
+      kind,
+      name:
+        "Our Notes Native " +
+        label +
+        (judgement === "perfect" ? "" : " " + judgement[0].toUpperCase() + judgement.slice(1)),
+      direction,
+      judgement,
+      lifetime: nativeParticleEffectLifetime(kind, j),
+    });
+}
+specs.push({
+  kind: "slide-loop",
+  name: "Our Notes Native Slide Loop",
+  direction: "none",
+  judgement: "perfect",
+  lifetime: 1,
+});
+const baseSpecs = specs.splice(0);
+for (const spec of baseSpecs)
+  for (const width of [4, 6, 10]) {
+    specs.push({ ...spec, width, name: spec.name + (width === 6 ? "" : ` Width ${width}`) });
+  }
+for (const [kind, label] of [
+  ["lane-input-blank-miss", "In Vain"],
+  ["lane-effect-normal", "Normal"],
+  ["lane-effect-slide", "Slide"],
+  ["lane-effect-flick", "Flick"],
+  ["lane-effect-flick-left", "Flick Left"],
+  ["lane-effect-flick-right", "Flick Right"],
+])
+  specs.push({
+    kind,
+    name: "Our Notes Lane " + label,
+    direction: "none",
+    judgement: "perfect",
+    lifetime: 0.225,
+    ground: true,
+    width: 4,
+  });
+window.captureCount = specs.length;
+const sprites = [],
+  effects = [];
+let slot = 0;
+const constant = (c) => ({ from: { c }, to: { c }, ease: "linear" });
+window.captureNext = async (index) => {
+  if (index !== effects.length) throw Error("Capture effects in order, once each");
+  const spec = specs[index];
+  if (!spec) throw Error("Invalid effect index");
+  // Native effect camera updates at 30 Hz. Loop samples use steady-state emission.
+  const frames = Math.min(32, Math.max(2, Math.ceil(spec.lifetime * 30)));
+  const frameRate = Math.min(30, frames / spec.lifetime);
+  const width = spec.width ?? captureWidth;
+  const unitX = new Vector3((19.12000084 * width) / 48, 0, -9.62).project(camera).x;
+  const groups = [];
+  const draw = (f) => {
+    const effect = {
+      id: 1,
+      kind: spec.kind,
+      direction: spec.direction,
+      judgement: spec.judgement,
+      lane: 12 - width / 2,
+      width,
+      age: (spec.kind === "slide-loop" ? 1 : 0) + f / frameRate,
+      lifetime: spec.kind === "slide-loop" ? 2 : spec.lifetime,
+      seed: 0x4f4e,
+    };
+    particles.update(spec.ground ? [] : [effect]);
+    particles.updateLaneInput(spec.ground ? [effect] : []);
+    renderer.setRenderTarget(null);
+    renderer.clear();
+    if (spec.ground) renderer.render(scene, camera);
+    else {
+      bloom.renderEffect(renderer, () => renderer.render(scene, camera));
+      bloom.composite(renderer);
+    }
+  };
+  particles.update([]);
+  let minX = 256,
+    minY = 144,
+    maxX = -1,
+    maxY = -1;
+  for (let f = 0; f < frames; f++) {
+    draw(f);
+    measureCtx.drawImage(renderer.domElement, 0, 0, 256, 144);
+    const p = measureCtx.getImageData(0, 0, 256, 144).data;
+    for (let y = 0; y < 144; y++)
+      for (let x = 0; x < 256; x++) {
+        const i = (y * 256 + x) * 4;
+        if (Math.max(p[i], p[i + 1], p[i + 2]) < 2) continue;
+        minX = Math.min(minX, x);
+        maxX = Math.max(maxX, x);
+        minY = Math.min(minY, y);
+        maxY = Math.max(maxY, y);
+      }
+  }
+  if (maxX < 0) throw Error("Empty rendered effect: " + spec.name);
+  minX = Math.max(0, minX - 2);
+  minY = Math.max(0, minY - 2);
+  maxX = Math.min(256, maxX + 3);
+  maxY = Math.min(144, maxY + 3);
+  const crop = [minX * 7.5, minY * 7.5, (maxX - minX) * 7.5, (maxY - minY) * 7.5];
+  const bounds = {
+    l: (minX / 128 - 1) / unitX,
+    r: (maxX / 128 - 1) / unitX,
+    b: -1 + (1 - maxY / 72 - origin.y) / unitY,
+    t: -1 + (1 - minY / 72 - origin.y) / unitY,
+  };
+  boundsByEffect.push({ name: spec.name, sourceWidth: width, unitX, bounds });
+  particles.update([]);
+  for (let f = 0; f < frames; f++) {
+    draw(f);
+    sampleCtx.clearRect(0, 0, sample.width, sample.height);
+    sampleCtx.drawImage(renderer.domElement, ...crop, 0, 0, sample.width, sample.height);
+    const pixels = sampleCtx.getImageData(0, 0, sample.width, sample.height);
+    // Sonolus uses straight-alpha sprites. Preserve emission on black; the
+    // missing additive blend on bright backgrounds is a documented loss.
+    for (let p = 0; p < pixels.data.length; p += 4) {
+      const a = Math.max(pixels.data[p], pixels.data[p + 1], pixels.data[p + 2]);
+      if (a) for (let c = 0; c < 3; c++) pixels.data[p + c] = Math.round((pixels.data[p + c] * 255) / a);
+      pixels.data[p + 3] = a;
+    }
+    const x = (slot % columns) * tileWidth + 1,
+      y = Math.floor(slot / columns) * tileHeight + 1;
+    ctx.putImageData(pixels, x, y);
+    if (y + sample.height > atlas.height) throw Error("Effect atlas capacity exceeded");
+    sprites.push({ x, y, w: sample.width, h: sample.height });
+    const start = f / frameRate / spec.lifetime;
+    const end = Math.min((f + 1) / frameRate / spec.lifetime, 1);
+    groups.push({
+      count: 1,
+      particles: [
+        {
+          sprite: slot++,
+          color: "#ffffff",
+          start,
+          duration: end - start,
+          x: constant((bounds.l + bounds.r) / 2),
+          y: constant((bounds.b + bounds.t) / 2),
+          // Sonolus/studio getPoint uses x +/- w and y +/- h.
+          w: constant((bounds.r - bounds.l) / 2),
+          h: constant((bounds.t - bounds.b) / 2),
+          r: constant(0),
+          // Studio includes both interval endpoints. 'none' steps to zero
+          // exactly at the end, preventing adjacent frames from doubling glow.
+          a: { from: { c: 1 }, to: { c: 0 }, ease: "none" },
+        },
+      ],
+    });
+  }
+  effects.push({
+    name: spec.name,
+    transform: Object.fromEntries(["x1", "y1", "x2", "y2", "x3", "y3", "x4", "y4"].map((k) => [k, { [k]: 1 }])),
+    groups,
+  });
+  document.querySelector("#status").textContent = `Captured ${index + 1}/${specs.length}: ${spec.name}`;
+  return { index, frames, slots: slot };
+};
+window.finishCapture = async () => {
+  if (effects.length !== specs.length) throw Error("Incomplete effect capture");
+  const blob = await new Promise((resolve) => atlas.toBlob(resolve, "image/png"));
+  if (!blob) throw Error("Atlas PNG encoding failed");
+  const save = async (name, options) => {
+    const response = await fetch(`/output/${name}`, options);
+    if (!response.ok) throw Error(`Saving ${name} failed: ${await response.text()}`);
+  };
+  await save("particle.texture.png", { method: "POST", body: blob });
+  await save("particle.json", {
+    method: "POST",
+    body: JSON.stringify({
+      width: 4096,
+      height: 4096,
+      interpolation: true,
+      sprites,
+      effects,
+    }),
+  });
+  await save("capture.json", {
+    method: "POST",
+    body: JSON.stringify({
+      schema: "cassiopeia-baked-effects-v1",
+      source: "effect001",
+      renderer: "Cassiopeia ParticleLayer + LiveUrpBloom",
+      sourceInfo,
+      seed: 0x4f4e,
+      captureWidth,
+      unitX,
+      unitY,
+      referenceValidated: false,
+      loopWarmupSeconds: 1,
+      boundsByEffect,
+      tileSize: [tileWidth, tileHeight],
+      specs,
+    }),
+  });
+  particles.dispose();
+  bloom.dispose();
+  renderer.dispose();
+  return { effects: effects.length, sprites: sprites.length };
+};
+window.captureReady = true;
+document.querySelector("#status").textContent = "Ready";
+
+// Full-resolution diagnostic view for comparison with recorded client frames.
+window.previewEffect = ({
+  kind = "tap",
+  direction = "none",
+  judgement = "perfect",
+  age = 0.1,
+  width = 4,
+  lane = 6,
+  screenWidth = 1554,
+  screenHeight = 1080,
+} = {}) => {
+  const aspect = screenWidth / screenHeight;
+  camera.aspect = aspect;
+  camera.fov = (2 * Math.atan((Math.tan((54 * Math.PI) / 360) * (16 / 9)) / Math.min(aspect, 16 / 9)) * 180) / Math.PI;
+  camera.updateProjectionMatrix();
+  renderer.setSize(screenWidth, screenHeight, false);
+  bloom.setSize(screenWidth, screenHeight);
+  const updateStarted = performance.now();
+  particles.update([]);
+  particles.updateLaneInput([]);
+  particles.update([
+    {
+      id: 1,
+      kind,
+      direction,
+      judgement,
+      lane,
+      width,
+      age,
+      lifetime: 1,
+      seed: 0x4f4e,
+    },
+  ]);
+  const cpuUpdateMs = performance.now() - updateStarted;
+  renderer.setRenderTarget(null);
+  renderer.clear();
+  bloom.renderEffect(renderer, () => renderer.render(scene, camera));
+  bloom.composite(renderer);
+  const stats = particles.stats;
+  const png = renderer.domElement.toDataURL("image/png");
+  particles.update([]);
+  camera.aspect = 16 / 9;
+  camera.fov = 54;
+  camera.updateProjectionMatrix();
+  renderer.setSize(1920, 1080, false);
+  bloom.setSize(1920, 1080);
+  return { png, age, width, lane, stats, cpuUpdateMs };
+};

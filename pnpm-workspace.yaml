@@ -1,0 +1,8 @@
+packages:
+  - "."
+  - "engine"
+
+autoInstallPeers: false
+
+allowBuilds:
+  esbuild: true
