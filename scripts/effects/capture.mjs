@@ -25,7 +25,6 @@ const hud = {
   lifeIconUrls: icons(["normal", "danger", "over"]),
   rankIconUrls: icons(["D", "C", "B", "A", "S", "SS"]),
   rankBaseUrl: placeholder,
-  roundMask14Url: placeholder,
   statusBaseUrl: placeholder,
   scoreStarUrl: placeholder,
   whiteSpriteUrl: placeholder,
@@ -67,16 +66,18 @@ const measure = document.createElement("canvas");
 measure.width = 256;
 measure.height = 144;
 const measureCtx = measure.getContext("2d", { willReadFrequently: true });
+// Sonolus binds exactly one PNG texture per level, so every frame shares one
+// atlas. 8192 is the largest texture size safe across Sonolus devices. Each
+// frame first gets the 4x floor (190x254 vs the legacy 94x126 tiles); the
+// remaining atlas budget is then distributed proportionally to each effect's
+// on-screen footprint so wide/tall effects stay as sharp as small ones.
 const atlas = document.createElement("canvas");
-atlas.width = 4096;
-atlas.height = 4096;
+atlas.width = 8192;
+atlas.height = 8192;
 const ctx = atlas.getContext("2d", { willReadFrequently: true });
-const tileWidth = 96,
-  tileHeight = 128;
-const columns = Math.floor(atlas.width / tileWidth);
+const floorTileWidth = 190,
+  floorTileHeight = 254;
 const sample = document.createElement("canvas");
-sample.width = tileWidth - 2;
-sample.height = tileHeight - 2;
 const sampleCtx = sample.getContext("2d", { willReadFrequently: true });
 const specs = [];
 for (const [kind, label, direction] of [
@@ -136,18 +137,15 @@ for (const [kind, label] of [
 window.captureCount = specs.length;
 const sprites = [],
   effects = [];
-let slot = 0;
+const plans = [];
+let atlasDensity = 0;
 const constant = (c) => ({ from: { c }, to: { c }, ease: "linear" });
-window.captureNext = async (index) => {
-  if (index !== effects.length) throw Error("Capture effects in order, once each");
-  const spec = specs[index];
-  if (!spec) throw Error("Invalid effect index");
+const frameSettings = (spec) => {
   // Native effect camera updates at 30 Hz. Loop samples use steady-state emission.
   const frames = Math.min(32, Math.max(2, Math.ceil(spec.lifetime * 30)));
   const frameRate = Math.min(30, frames / spec.lifetime);
   const width = spec.width ?? captureWidth;
   const unitX = new Vector3((19.12000084 * width) / 48, 0, -9.62).project(camera).x;
-  const groups = [];
   const draw = (f) => {
     const effect = {
       id: 1,
@@ -170,6 +168,14 @@ window.captureNext = async (index) => {
       bloom.composite(renderer);
     }
   };
+  return { frames, frameRate, width, unitX, draw };
+};
+// Phase 1: measure every effect's live bounds from a 256x144 probe.
+window.measureNext = async (index) => {
+  if (index !== plans.length) throw Error("Measure effects in order, once each");
+  const spec = specs[index];
+  if (!spec) throw Error("Invalid effect index");
+  const { frames, frameRate, width, unitX, draw } = frameSettings(spec);
   particles.update([]);
   let minX = 256,
     minY = 144,
@@ -202,6 +208,64 @@ window.captureNext = async (index) => {
     t: -1 + (1 - minY / 72 - origin.y) / unitY,
   };
   boundsByEffect.push({ name: spec.name, sourceWidth: width, unitX, bounds });
+  plans.push({ spec, frames, frameRate, crop, bounds, draw });
+  document.querySelector("#status").textContent = `Measured ${index + 1}/${specs.length}: ${spec.name}`;
+  return { index, frames };
+};
+// Phase 2: solve the per-effect tile sizes and shelf-pack every frame.
+const layoutAtlas = (density) => {
+  for (const plan of plans) {
+    plan.tileW = Math.max(floorTileWidth, 2 * Math.ceil((plan.crop[2] * density) / 2));
+    plan.tileH = Math.max(floorTileHeight, 2 * Math.ceil((plan.crop[3] * density) / 2));
+    plan.slots = [];
+  }
+  const order = plans.flatMap((plan, specIndex) =>
+    Array.from({ length: plan.frames }, (_, f) => ({ plan, f, specIndex })),
+  );
+  // Tallest first keeps shelves tight; the spec index keeps the layout deterministic.
+  order.sort((a, b) => b.plan.tileH - a.plan.tileH || a.specIndex - b.specIndex);
+  const shelves = [];
+  for (const { plan, f } of order) {
+    const { tileW, tileH } = plan;
+    let shelf = shelves.find((s) => s.h >= tileH && atlas.width - s.x >= tileW);
+    if (!shelf) {
+      shelf = { x: 0, h: tileH, y: shelves.reduce((total, s) => total + s.h, 0) };
+      shelves.push(shelf);
+    }
+    plan.slots[f] = { x: shelf.x, y: shelf.y };
+    shelf.x += tileW;
+  }
+  return shelves.reduce((total, s) => total + s.h, 0);
+};
+window.allocateAtlas = () => {
+  if (plans.length !== specs.length) throw Error("Incomplete effect measurement");
+  let lo = 0,
+    hi = 1;
+  for (let i = 0; i < 40; i++) {
+    if (layoutAtlas((lo + hi) / 2) <= atlas.height - 64) lo = (lo + hi) / 2;
+    else hi = (lo + hi) / 2;
+  }
+  if (lo === 0 || layoutAtlas(lo) > atlas.height - 64) throw Error("Effect atlas capacity exceeded");
+  atlasDensity = lo;
+  for (let i = 0; i < plans.length; i++) boundsByEffect[i].tile = [plans[i].tileW, plans[i].tileH];
+  document.querySelector("#status").textContent = `Allocated atlas at density ${lo.toFixed(3)}`;
+  return {
+    density: lo,
+    packedHeight: layoutAtlas(lo),
+    minTile: Math.min(...plans.map((p) => p.tileW * p.tileH)),
+    maxTile: Math.max(...plans.map((p) => p.tileW * p.tileH)),
+  };
+};
+// Phase 3: capture every frame into its allocated tile.
+window.captureNext = async (index) => {
+  if (index !== effects.length) throw Error("Capture effects in order, once each");
+  const plan = plans[index];
+  if (!plan) throw Error("Invalid effect index");
+  if (!plan.slots?.length) throw Error("Allocate the atlas before capture");
+  const { spec, frames, frameRate, crop, bounds, draw } = plan;
+  sample.width = plan.tileW - 2;
+  sample.height = plan.tileH - 2;
+  const groups = [];
   particles.update([]);
   for (let f = 0; f < frames; f++) {
     draw(f);
@@ -215,18 +279,16 @@ window.captureNext = async (index) => {
       if (a) for (let c = 0; c < 3; c++) pixels.data[p + c] = Math.round((pixels.data[p + c] * 255) / a);
       pixels.data[p + 3] = a;
     }
-    const x = (slot % columns) * tileWidth + 1,
-      y = Math.floor(slot / columns) * tileHeight + 1;
-    ctx.putImageData(pixels, x, y);
-    if (y + sample.height > atlas.height) throw Error("Effect atlas capacity exceeded");
-    sprites.push({ x, y, w: sample.width, h: sample.height });
+    const { x, y } = plan.slots[f];
+    ctx.putImageData(pixels, x + 1, y + 1);
+    sprites.push({ x: x + 1, y: y + 1, w: sample.width, h: sample.height });
     const start = f / frameRate / spec.lifetime;
     const end = Math.min((f + 1) / frameRate / spec.lifetime, 1);
     groups.push({
       count: 1,
       particles: [
         {
-          sprite: slot++,
+          sprite: sprites.length - 1,
           color: "#ffffff",
           start,
           duration: end - start,
@@ -249,7 +311,7 @@ window.captureNext = async (index) => {
     groups,
   });
   document.querySelector("#status").textContent = `Captured ${index + 1}/${specs.length}: ${spec.name}`;
-  return { index, frames, slots: slot };
+  return { index, frames, tile: [plan.tileW, plan.tileH] };
 };
 window.finishCapture = async () => {
   if (effects.length !== specs.length) throw Error("Incomplete effect capture");
@@ -263,8 +325,8 @@ window.finishCapture = async () => {
   await save("particle.json", {
     method: "POST",
     body: JSON.stringify({
-      width: 4096,
-      height: 4096,
+      width: 8192,
+      height: 8192,
       interpolation: true,
       sprites,
       effects,
@@ -284,7 +346,8 @@ window.finishCapture = async () => {
       referenceValidated: false,
       loopWarmupSeconds: 1,
       boundsByEffect,
-      tileSize: [tileWidth, tileHeight],
+      tileSize: [floorTileWidth, floorTileHeight],
+      tileDensity: atlasDensity,
       specs,
     }),
   });
