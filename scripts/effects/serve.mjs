@@ -48,7 +48,7 @@ const server = createServer(async (req, res) => {
       let bytes = 0;
       for await (const c of req) {
         bytes += c.length;
-        if (bytes > 32 * 1024 * 1024) throw Error("Upload limit");
+        if (bytes > 128 * 1024 * 1024) throw Error("Upload limit");
         chunks.push(c);
       }
       writeFileSync(safe(output, path.slice(8)), Buffer.concat(chunks));
