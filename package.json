@@ -25,9 +25,7 @@
   "scripts": {
     "build": "vite build && tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "check": "pnpm typecheck && pnpm build",
-    "build:engine": "pnpm --filter @haneoka/cassiopeia-sonolus-engine build",
-    "effects:serve": "node scripts/effects/serve.mjs"
+    "check": "pnpm typecheck && pnpm build"
   },
   "peerDependencies": {
     "@haneoka/cassiopeia": "^0.1.0",
@@ -46,5 +44,5 @@
   "dependencies": {
     "@sonolus/core": "7.15.3"
   },
-  "description": "Sonolus chart conversion, engine targets and effect capture for Cassiopeia"
+  "description": "Sonolus chart conversion bridge for Cassiopeia"
 }
