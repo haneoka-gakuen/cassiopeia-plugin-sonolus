@@ -64,6 +64,8 @@ const server = createServer(async (req, res) => {
     let file;
     if (path === "/") file = resolve(root, "scripts/effects/capture.html");
     else if (path === "/capture.mjs") file = resolve(root, "scripts/effects/capture.mjs");
+    else if (path === "/sonolus-preview.mjs") file = resolve(root, "scripts/effects/sonolus-preview.mjs");
+    else if (/^\/output\/(particle\.texture\.png|particle\.json)$/.test(path)) file = safe(output, path.slice(8));
     else if (path.startsWith("/asset/")) {
       // Materials sample the complete Texture2D, not a tight Sprite crop.
       // ef_tap_particle_star is 128x128; its 47x125 derivative would stretch

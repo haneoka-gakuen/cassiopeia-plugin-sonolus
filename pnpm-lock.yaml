@@ -28,21 +28,21 @@ importers:
   engine:
     dependencies:
       '@sonolus/core':
-        specifier: 7.15.3
-        version: 7.15.3
+        specifier: 7.15.4
+        version: 7.15.4
     devDependencies:
       '@sonolus/express':
-        specifier: 7.5.3
-        version: 7.5.3(@sonolus/core@7.15.3)(express@4.22.3)(multer@2.2.0)(typebox@1.3.7)
+        specifier: 7.5.4
+        version: 7.5.4(@sonolus/core@7.15.4)(express@4.22.3)(multer@2.2.0)(typebox@1.3.7)
       '@sonolus/free-pack':
         specifier: 1.2.0
         version: 1.2.0
       '@sonolus/sonolus.js':
-        specifier: 9.7.3
-        version: 9.7.3(@sonolus/core@7.15.3)(@sonolus/express@7.5.3(@sonolus/core@7.15.3)(express@4.22.3)(multer@2.2.0)(typebox@1.3.7))(@sonolus/free-pack@1.2.0)(@sonolus/sonolus.js-compiler@1.8.3(@sonolus/core@7.15.3)(typebox@1.3.7))
+        specifier: 9.7.4
+        version: 9.7.4(@sonolus/core@7.15.4)(@sonolus/express@7.5.4(@sonolus/core@7.15.4)(express@4.22.3)(multer@2.2.0)(typebox@1.3.7))(@sonolus/free-pack@1.2.0)(@sonolus/sonolus.js-compiler@1.8.4(@sonolus/core@7.15.4)(typebox@1.3.7))
       '@sonolus/sonolus.js-compiler':
-        specifier: 1.8.3
-        version: 1.8.3(@sonolus/core@7.15.3)(typebox@1.3.7)
+        specifier: 1.8.4
+        version: 1.8.4(@sonolus/core@7.15.4)(typebox@1.3.7)
       '@types/node':
         specifier: 22.20.1
         version: 22.20.1
@@ -362,31 +362,34 @@ packages:
   '@sonolus/core@7.15.3':
     resolution: {integrity: sha512-P+sni4deb/L2XxCKV4a3lhGGu4FP+p2uQr9jDrp0EukbdpvkEzXp/pcO6/3H/ZyZjK93FROipUfF3AP1x8G7hA==}
 
-  '@sonolus/express@7.5.3':
-    resolution: {integrity: sha512-Goo+rQ+nhjkOrOI5+XDHO5YGPmeSqS7YC8rtwZHl/q1/aU6So8C/NosdkjHACSysbz1vJwI0Y4YVQNVkB3GLCQ==}
+  '@sonolus/core@7.15.4':
+    resolution: {integrity: sha512-/MPZC3wlhH6SK04qlzZYvXbNh1ZkOh0c/d5ewQSGhEVP0nP0o8yz11UIikSbdr6vd12sTLjrBl2imVLvHqGnnw==}
+
+  '@sonolus/express@7.5.4':
+    resolution: {integrity: sha512-MCHIwIxVDkpeuJRTmE3uIgvUSC1sGPXeV0cE1a/KyxYwqJOrBy0dWqSa+Zvf/Sm/Q2nh03OIEvAbXuIpEBS+nA==}
     peerDependencies:
-      '@sonolus/core': ~7.15.3
+      '@sonolus/core': ~7.15.4
       express: ^4.22.2
       multer: ^2.2.0
-      typebox: ^1.3.7
+      typebox: ^1.3.19
 
   '@sonolus/free-pack@1.2.0':
     resolution: {integrity: sha512-jWeChsVjDbM5H0buEmDNA1Mpz0FaUEYcArrmRR9uX0yuPGsQ4KHn1ktfETKLGs4MibMeTn1fABxGij3/jd9wIw==}
 
-  '@sonolus/sonolus.js-compiler@1.8.3':
-    resolution: {integrity: sha512-dBDgiZjUiLJ+DvqoEGHutNcm2qtnkcjR3eokKGfXaQ64+d0R+drp4iEr9Wwpc+cd52wYz9Xi0sfaFR12DeF2lg==}
+  '@sonolus/sonolus.js-compiler@1.8.4':
+    resolution: {integrity: sha512-o/4podEl63zbV6FkVv5hstQXUM0pFKczTK3PDUEnDcOsE5oSkP58EghEyCT/RRMN6NozFHPcVuX3z3MtD7Ed7A==}
     peerDependencies:
-      '@sonolus/core': ~7.15.3
-      typebox: ^1.3.7
+      '@sonolus/core': ~7.15.4
+      typebox: ^1.3.19
 
-  '@sonolus/sonolus.js@9.7.3':
-    resolution: {integrity: sha512-zl6YV17Va6TVbtZy3p/x5rJ3+1QC6jA6ZTc7ChJ3UkEzSajS1n34gXwxx5CLFGSOnDVD0AhQk6mvyXt24KlNBA==}
+  '@sonolus/sonolus.js@9.7.4':
+    resolution: {integrity: sha512-Ic3a3dtO03U/4EcjU9caoDVR9WVmAmekNhd2d8KU0JQk2PLf/O7s97WFFRyrQhpLwkq8gDpslCjF6IVZdU7adA==}
     hasBin: true
     peerDependencies:
-      '@sonolus/core': ~7.15.3
-      '@sonolus/express': ~7.5.3
+      '@sonolus/core': ~7.15.4
+      '@sonolus/express': ~7.5.4
       '@sonolus/free-pack': ~1.2.0
-      '@sonolus/sonolus.js-compiler': ~1.8.3
+      '@sonolus/sonolus.js-compiler': ~1.8.4
 
   '@types/estree@1.0.9':
     resolution: {integrity: sha512-GhdPgy1el4/ImP05X05Uw4cw2/M93BCUmnEvWZNStlCzEKME4Fkk+YpoA5OiHNQmoS7Cafb8Xa3Pya8m1Qrzeg==}
@@ -985,27 +988,29 @@ snapshots:
 
   '@sonolus/core@7.15.3': {}
 
-  '@sonolus/express@7.5.3(@sonolus/core@7.15.3)(express@4.22.3)(multer@2.2.0)(typebox@1.3.7)':
+  '@sonolus/core@7.15.4': {}
+
+  '@sonolus/express@7.5.4(@sonolus/core@7.15.4)(express@4.22.3)(multer@2.2.0)(typebox@1.3.7)':
     dependencies:
-      '@sonolus/core': 7.15.3
+      '@sonolus/core': 7.15.4
       express: 4.22.3
       multer: 2.2.0
       typebox: 1.3.7
 
   '@sonolus/free-pack@1.2.0': {}
 
-  '@sonolus/sonolus.js-compiler@1.8.3(@sonolus/core@7.15.3)(typebox@1.3.7)':
+  '@sonolus/sonolus.js-compiler@1.8.4(@sonolus/core@7.15.4)(typebox@1.3.7)':
     dependencies:
-      '@sonolus/core': 7.15.3
+      '@sonolus/core': 7.15.4
       acorn: 8.18.0
       typebox: 1.3.7
 
-  '@sonolus/sonolus.js@9.7.3(@sonolus/core@7.15.3)(@sonolus/express@7.5.3(@sonolus/core@7.15.3)(express@4.22.3)(multer@2.2.0)(typebox@1.3.7))(@sonolus/free-pack@1.2.0)(@sonolus/sonolus.js-compiler@1.8.3(@sonolus/core@7.15.3)(typebox@1.3.7))':
+  '@sonolus/sonolus.js@9.7.4(@sonolus/core@7.15.4)(@sonolus/express@7.5.4(@sonolus/core@7.15.4)(express@4.22.3)(multer@2.2.0)(typebox@1.3.7))(@sonolus/free-pack@1.2.0)(@sonolus/sonolus.js-compiler@1.8.4(@sonolus/core@7.15.4)(typebox@1.3.7))':
     dependencies:
-      '@sonolus/core': 7.15.3
-      '@sonolus/express': 7.5.3(@sonolus/core@7.15.3)(express@4.22.3)(multer@2.2.0)(typebox@1.3.7)
+      '@sonolus/core': 7.15.4
+      '@sonolus/express': 7.5.4(@sonolus/core@7.15.4)(express@4.22.3)(multer@2.2.0)(typebox@1.3.7)
       '@sonolus/free-pack': 1.2.0
-      '@sonolus/sonolus.js-compiler': 1.8.3(@sonolus/core@7.15.3)(typebox@1.3.7)
+      '@sonolus/sonolus.js-compiler': 1.8.4(@sonolus/core@7.15.4)(typebox@1.3.7)
       esbuild: 0.28.2
       express: 4.22.3
       fs-extra: 11.4.0

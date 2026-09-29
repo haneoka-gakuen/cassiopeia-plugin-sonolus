@@ -6,6 +6,14 @@ import {
   LiveUrpBloomPipeline,
 } from "@haneoka/cassiopeia-renderer-three";
 import { createOurNotesAssetManifest, nativeParticleEffectLifetime } from "@haneoka/cassiopeia-plugin-our-notes";
+import {
+  SonolusParticlePreview,
+  groundEffectLayout,
+  linearEffectLayout,
+  planeEffectLayout,
+  stageToPixel,
+  stageTransform,
+} from "/sonolus-preview.mjs";
 
 const placeholder = "/unused";
 const sourceInfo = await fetch("/source.json").then((response) => {
@@ -29,8 +37,10 @@ const hud = {
   scoreStarUrl: placeholder,
   whiteSpriteUrl: placeholder,
 };
+// ?quality=2 selects the authored effect001Light profile (native quality 2).
+const quality = Number(new URLSearchParams(location.search).get("quality") ?? "0");
 const assets = createOurNotesAssetManifest(
-  { noteAtlasTextureUrl: placeholder, hud },
+  { noteAtlasTextureUrl: placeholder, hud, currentQuality: Number.isInteger(quality) ? quality : 0 },
   {
     asset: (path) => "/asset/" + path,
     runtime: (path) => "/runtime/" + path,
@@ -406,4 +416,55 @@ window.previewEffect = ({
   renderer.setSize(1920, 1080, false);
   bloom.setSize(1920, 1080);
   return { png, age, width, lane, stats, cpuUpdateMs };
+};
+
+// Native Sonolus particle preview of /output/particle.json at the same
+// screen size, for numeric comparison with previewEffect().
+let sonolusPreview;
+window.previewSonolus = async ({
+  names = [],
+  ground = [],
+  chartLane = 6,
+  width = 4,
+  progress = 0.1,
+  screenWidth = 1554,
+  screenHeight = 1080,
+  seed = 1,
+} = {}) => {
+  if (!sonolusPreview) {
+    const data = await fetch("/output/particle.json", { cache: "no-store" }).then((r) => r.json());
+    const image = await createImageBitmap(
+      await fetch("/output/particle.texture.png", { cache: "no-store" }).then((r) => r.blob()),
+      { premultiplyAlpha: "none", colorSpaceConversion: "none" },
+    );
+    sonolusPreview = new SonolusParticlePreview(data, image);
+  }
+  const canvas = new OffscreenCanvas(screenWidth, screenHeight);
+  const ctx = canvas.getContext("2d");
+  ctx.fillStyle = "#000";
+  ctx.fillRect(0, 0, screenWidth, screenHeight);
+  const tr = stageTransform(screenWidth / screenHeight);
+  const toPixel = stageToPixel(tr, screenWidth, screenHeight);
+  // chartToLevelData: lane = (pos + size / 2) / 2 - 6, size = width / 4.
+  const lane = (chartLane + width / 2) / 2 - 6;
+  const size = width / 4;
+  let drawn = 0;
+  for (const name of names) {
+    // Layered native effects: "<name> P0".."P3", each on its own plane.
+    if (sonolusPreview.byName.has(`${name} P0`)) {
+      for (let plane = 0; plane < 4; plane += 1)
+        drawn += sonolusPreview.draw(ctx, `${name} P${plane}`, planeEffectLayout(tr, plane, lane, size), progress, toPixel, seed + plane * 7919);
+    } else drawn += sonolusPreview.draw(ctx, name, linearEffectLayout(tr, lane, size), progress, toPixel, seed);
+  }
+  for (const name of ground)
+    drawn += sonolusPreview.draw(ctx, name, groundEffectLayout(tr, lane, size), progress, toPixel, seed);
+  const blob = await canvas.convertToBlob({ type: "image/png" });
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return { png: "data:image/png;base64," + btoa(binary), drawn };
+};
+window.reloadSonolus = () => {
+  sonolusPreview = undefined;
+  return true;
 };
