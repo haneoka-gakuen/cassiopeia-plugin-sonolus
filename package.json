@@ -20,6 +20,10 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
+    "./usc": {
+      "types": "./dist/usc-entry.d.ts",
+      "import": "./dist/usc.js"
+    },
     "./package.json": "./package.json"
   },
   "scripts": {

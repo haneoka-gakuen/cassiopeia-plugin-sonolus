@@ -1,5 +1,5 @@
 import { EngineArchetypeDataName, EngineArchetypeName, type LevelData, type LevelDataEntity } from "@sonolus/core";
-import type { USC, USCBpmChange, USCObject, USCSingleNote, USCSlideNote, USCTimeScaleChange } from "../chartToUsc.js";
+import type { USC, USCBpmChange, USCObject, USCSingleNote, USCSlideNote, USCTimeScaleChange } from "./types.js";
 
 type Intermediate = {
   archetype: string;
