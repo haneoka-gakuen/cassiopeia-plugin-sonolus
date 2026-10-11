@@ -48,5 +48,16 @@
   "dependencies": {
     "@sonolus/core": "7.15.3"
   },
-  "description": "Sonolus chart conversion bridge for Cassiopeia"
+  "description": "Sonolus chart conversion bridge for Cassiopeia",
+  "keywords": [
+    "cassiopeia",
+    "sonolus",
+    "rhythm-game",
+    "usc",
+    "chart-conversion"
+  ],
+  "homepage": "https://github.com/haneoka-gakuen/cassiopeia-plugin-sonolus#readme",
+  "bugs": {
+    "url": "https://github.com/haneoka-gakuen/cassiopeia-plugin-sonolus/issues"
+  }
 }
