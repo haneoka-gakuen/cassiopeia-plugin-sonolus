@@ -269,6 +269,7 @@ export function chartToLevelData(chart: InternalChart, offset = 0): LevelData {
   const beatAndTickToSim = new Map<number, Map<number, Intermediate[]>>();
   const refs = new Map<Intermediate, string>();
   const materialized = new Map<Intermediate, LevelDataEntity>();
+  const lineNodes = new Map<number, ReturnType<typeof lineNode>>();
   let refId = 0;
 
   const getRef = (intermediate: Intermediate) => {
@@ -283,6 +284,7 @@ export function chartToLevelData(chart: InternalChart, offset = 0): LevelData {
   };
 
   const append = (intermediate: Intermediate) => {
+    if (materialized.has(intermediate)) return;
     const entity: LevelDataEntity = { archetype: intermediate.archetype, data: [] };
     const operateType = intermediate.data.operateType;
     if (intermediate.sim && typeof operateType === "number" && isPairNoteType(operateType)) {
@@ -329,18 +331,25 @@ export function chartToLevelData(chart: InternalChart, offset = 0): LevelData {
       .sort((a, b) => a.beat - b.beat || lineSortKey(a) - lineSortKey(b) || a.id - b.id);
     if (notes.length < 2) continue;
 
-    const records = notes.map((note, index) => lineNode(line, note, index, notes.length));
+    const records = notes.map((note, index) => {
+      let record = lineNodes.get(note.id);
+      if (!record) {
+        record = lineNode(line, note, index, notes.length);
+        lineNodes.set(note.id, record);
+      }
+      return record;
+    });
     const joints = records.filter((record) => record.joint).map((record) => record.intermediate);
     const connectors: Intermediate[] = [];
-    const start = records[0].intermediate;
-    const end = records[records.length - 1].intermediate;
+    const start = records[0]!.intermediate;
+    const end = records[records.length - 1]!.intermediate;
     // Connector archetype imports must match the actual start archetype. An
     // authored critical end does not turn an otherwise normal slide yellow.
     const criticalStart = start.archetype === "CriticalSlideStartNote";
 
     for (let i = 1; i < joints.length; i++) {
-      const head = joints[i - 1];
-      const tail = joints[i];
+      const head = joints[i - 1]!;
+      const tail = joints[i]!;
       connectors.push({
         archetype:
           line.kind === "long"
@@ -373,7 +382,7 @@ export function chartToLevelData(chart: InternalChart, offset = 0): LevelData {
         );
         record.intermediate.data.attach = connectors[connectorIndex];
       }
-      if (record.end && connectors.length) record.intermediate.data.slide = connectors[connectors.length - 1];
+      if (record.end && connectors.length) record.intermediate.data.slide ??= connectors[connectors.length - 1];
       append(record.intermediate);
       if (record.judgment) append(record.judgment);
     }
