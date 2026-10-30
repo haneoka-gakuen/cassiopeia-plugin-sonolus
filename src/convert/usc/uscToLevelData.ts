@@ -180,11 +180,15 @@ const slide: Handler<USCSlideNote> = (object, append) => {
     easeR?: EaseName;
   };
 
-  const connectionEases = (connection: { ease?: EaseName; easeL?: EaseName; easeR?: EaseName }) => ({
-    ease: connection.ease,
-    easeL: connection.easeL ?? connection.ease,
-    easeR: connection.easeR ?? connection.ease,
-  });
+  const connectionEases = (connection: { ease?: EaseName; easeL?: EaseName; easeR?: EaseName }) => {
+    const easeL = connection.easeL ?? connection.ease;
+    const easeR = connection.easeR ?? connection.ease;
+    return {
+      ...(connection.ease === undefined ? {} : { ease: connection.ease }),
+      ...(easeL === undefined ? {} : { easeL }),
+      ...(easeR === undefined ? {} : { easeR }),
+    };
+  };
 
   const cis: ConnectionIntermediate[] = [];
   const joints: ConnectionIntermediate[] = [];
@@ -370,7 +374,7 @@ const slide: Handler<USCSlideNote> = (object, append) => {
   for (const [i, joint] of joints.entries()) {
     if (i === 0) continue;
 
-    const head = joints[i - 1];
+    const head = joints[i - 1]!;
     const easeL = head.easeL ?? head.ease;
     const easeR = head.easeR ?? head.ease;
     if (!head.ease || !easeL || !easeR) throw new Error("Unexpected missing ease");

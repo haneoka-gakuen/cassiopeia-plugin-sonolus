@@ -179,12 +179,13 @@ function toLineConnection(line: NoteLine, n: ResolvedNote): USCSlideConnection |
     case NoteOperateType.SlideEndFlick:
     case NoteOperateType.SlideEndTrace: {
       const flick = n.operateType === NoteOperateType.SlideEndFlick;
+      const direction = flick ? (dirOf(n.direction) ?? "up") : dirOf(n.direction);
       return {
         type: "end",
         ...toLaneConnection(n),
         trace: n.operateType === NoteOperateType.SlideEndTrace,
         critical: n.critical,
-        direction: flick ? (dirOf(n.direction) ?? "up") : dirOf(n.direction),
+        ...(direction === undefined ? {} : { direction }),
       };
     }
     case NoteOperateType.HiddenSlideEnd:
@@ -225,6 +226,7 @@ export function chartToUsc(chart: InternalChart): USC {
   for (const n of chart.notes) {
     if (n.lineIds.length > 0) continue;
     const flick = isFlickOp(n.operateType);
+    const direction = flick ? (dirOf(n.direction) ?? "up") : dirOf(n.direction);
     objects.push({
       type: "single",
       beat: n.beat,
@@ -233,7 +235,7 @@ export function chartToUsc(chart: InternalChart): USC {
       trace: isTraceOp(n.operateType),
       critical: n.critical,
       // a flick note gets a direction; plain flick (dir Normal) → "up"
-      direction: flick ? (dirOf(n.direction) ?? "up") : dirOf(n.direction),
+      ...(direction === undefined ? {} : { direction }),
     });
   }
 
