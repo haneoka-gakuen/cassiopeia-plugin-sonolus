@@ -19,6 +19,7 @@ const easeOf = (ease: NoteLineEaseType | null) =>
   ease === NoteLineEaseType.EaseIn ? -1 : ease === NoteLineEaseType.EaseOut ? 1 : 0;
 
 const originalData = (note: ResolvedNote) => ({
+  originalNoteId: note.id,
   [EngineArchetypeDataName.Beat]: note.beat,
   lane: laneOf(note),
   size: halfWidthOf(note),
@@ -264,7 +265,7 @@ function lineNode(
   }
 }
 
-export function chartToLevelData(chart: InternalChart, offset = 0): LevelData {
+export function chartToLevelData(chart: Omit<InternalChart, "passthrough">, offset = 0, options: { includeSourceIds?: boolean } = {}): LevelData {
   const entities: LevelDataEntity[] = [];
   const beatAndTickToSim = new Map<number, Map<number, Intermediate[]>>();
   const refs = new Map<Intermediate, string>();
@@ -303,6 +304,7 @@ export function chartToLevelData(chart: InternalChart, offset = 0): LevelData {
     materialized.set(intermediate, entity);
     entities.push(entity);
     for (const [name, value] of Object.entries(intermediate.data)) {
+      if (name === "originalNoteId" && !options.includeSourceIds) continue;
       if (value === undefined) continue;
       entity.data.push(typeof value === "number" ? { name, value } : { name, ref: getRef(value) });
     }
